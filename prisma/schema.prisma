@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id               String       @id @default(uuid())
+  email            String       @unique
+  phone            String?      @unique
+  passwordHash     String       @map("password_hash")
+  name             String
+  status           UserStatus   @default(ACTIVE)
+  isSuperAdmin     Boolean      @default(false) @map("is_super_admin")
+  refreshTokenHash String?      @map("refresh_token_hash")
+  lastLoginAt      DateTime?    @map("last_login_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+
+  roles         UserRole[]
+  branches      UserBranch[]
+  auditLogs     AuditLog[]
+  uploadedFiles FileRecord[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  module      String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Branch {
+  id        String    @id @default(uuid())
+  name      String
+  code      String    @unique
+  address   String?
+  phone     String?
+  email     String?
+  isActive  Boolean   @default(true) @map("is_active")
+  isMain    Boolean   @default(false) @map("is_main")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  warehouses   Warehouse[]
+  userBranches UserBranch[]
+  auditLogs    AuditLog[]
+
+  @@map("branches")
+}
+
+model Warehouse {
+  id        String    @id @default(uuid())
+  branchId  String?   @map("branch_id")
+  name      String
+  code      String    @unique
+  location  String?
+  isDefault Boolean   @default(false) @map("is_default")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@map("warehouses")
+}
+
+model UserBranch {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  branchId   String   @map("branch_id")
+  isDefault  Boolean  @default(false) @map("is_default")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, branchId])
+  @@map("user_branches")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  branchId   String?  @map("branch_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([branchId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model FileRecord {
+  id           String    @id @default(uuid())
+  originalName String    @map("original_name")
+  objectKey    String    @unique @map("object_key")
+  bucket       String
+  mimeType     String    @map("mime_type")
+  sizeBytes    Int       @map("size_bytes")
+  extension    String
+  uploadedById String?   @map("uploaded_by_id")
+  module       String
+  entityType   String?   @map("entity_type")
+  entityId     String?   @map("entity_id")
+  isPrivate    Boolean   @default(false) @map("is_private")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  uploadedBy    User?          @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  productImages ProductImage[]
+
+  @@index([module, entityType, entityId])
+  @@index([uploadedById])
+  @@map("files")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Product Catalog Models
+// ---------------------------------------------------------------------------
+
+enum ProductType {
+  PHYSICAL
+  SERVICE
+  BUNDLE
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum BarcodeType {
+  CODE128
+  EAN13
+  UPC
+  QR
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  parentId    String?   @map("parent_id")
+  image       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryToCategory")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  logo        String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  products Product[]
+
+  @@map("brands")
+}
+
+model Attribute {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  values AttributeValue[]
+
+  @@map("attributes")
+}
+
+model AttributeValue {
+  id          String   @id @default(uuid())
+  attributeId String   @map("attribute_id")
+  value       String
+  code        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  attribute     Attribute                     @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  variantValues ProductVariantAttributeValue[]
+
+  @@unique([attributeId, value])
+  @@map("attribute_values")
+}
+
+model Product {
+  id             String        @id @default(uuid())
+  name           String
+  slug           String        @unique
+  description    String?
+  categoryId     String        @map("category_id")
+  brandId        String?       @map("brand_id")
+  sku            String        @unique
+  barcode        String?       @unique
+  type           ProductType   @default(PHYSICAL)
+  status         ProductStatus @default(DRAFT)
+  costPrice      Decimal       @default(0) @map("cost_price") @db.Decimal(18, 2)
+  sellingPrice   Decimal       @default(0) @map("selling_price") @db.Decimal(18, 2)
+  wholesalePrice Decimal?      @map("wholesale_price") @db.Decimal(18, 2)
+  minStockAlert  Int           @default(5) @map("min_stock_alert")
+  trackSerial    Boolean       @default(false) @map("track_serial")
+  hasVariants    Boolean       @default(false) @map("has_variants")
+  warrantyMonths Int?          @default(0) @map("warranty_months")
+  warrantyPolicy String?       @map("warranty_policy")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+
+  category       Category               @relation(fields: [categoryId], references: [id])
+  brand          Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  variants       ProductVariant[]
+  barcodes       ProductBarcode[]
+  images         ProductImage[]
+  specifications ProductSpecification[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([sku])
+  @@map("products")
+}
+
+model ProductVariant {
+  id             String    @id @default(uuid())
+  productId      String    @map("product_id")
+  name           String
+  sku            String    @unique
+  barcode        String?   @unique
+  costPrice      Decimal?  @map("cost_price") @db.Decimal(18, 2)
+  sellingPrice   Decimal?  @map("selling_price") @db.Decimal(18, 2)
+  wholesalePrice Decimal?  @map("wholesale_price") @db.Decimal(18, 2)
+  minStockAlert  Int?      @map("min_stock_alert")
+  image          String?
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  product         Product                        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributeValues ProductVariantAttributeValue[]
+  barcodes        ProductBarcode[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductVariantAttributeValue {
+  id               String @id @default(uuid())
+  variantId        String @map("variant_id")
+  attributeValueId String @map("attribute_value_id")
+
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, attributeValueId])
+  @@map("product_variant_attribute_values")
+}
+
+model ProductBarcode {
+  id        String      @id @default(uuid())
+  productId String      @map("product_id")
+  variantId String?     @map("variant_id")
+  barcode   String      @unique
+  isPrimary Boolean     @default(true) @map("is_primary")
+  type      BarcodeType @default(CODE128)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([variantId])
+  @@map("product_barcodes")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  fileId    String?  @map("file_id")
+  url       String
+  isPrimary Boolean  @default(false) @map("is_primary")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  file    FileRecord? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model SpecificationGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  specifications ProductSpecification[]
+
+  @@map("specification_groups")
+}
+
+model ProductSpecification {
+  id        String  @id @default(uuid())
+  productId String  @map("product_id")
+  groupId   String? @map("group_id")
+  key       String
+  value     String
+  sortOrder Int     @default(0) @map("sort_order")
+
+  product Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  group   SpecificationGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@map("product_specifications")
+}
