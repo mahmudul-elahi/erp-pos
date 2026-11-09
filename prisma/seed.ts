@@ -25,6 +25,12 @@ const PERMISSIONS = [
   { name: 'products.manage', module: 'products', description: 'Create and manage product catalog' },
   { name: 'products.view', module: 'products', description: 'View product catalog' },
 
+  // People (Customers & Suppliers)
+  { name: 'customers.manage', module: 'customers', description: 'Create, update, and manage customers' },
+  { name: 'customers.view', module: 'customers', description: 'View customers list and customer ledgers' },
+  { name: 'suppliers.manage', module: 'suppliers', description: 'Create, update, and manage suppliers' },
+  { name: 'suppliers.view', module: 'suppliers', description: 'View suppliers list and supplier ledgers' },
+
   // Inventory & Logistics
   { name: 'inventory.manage', module: 'inventory', description: 'Perform stock adjustments and transfers' },
   { name: 'inventory.view', module: 'inventory', description: 'View inventory levels and movements' },
@@ -115,6 +121,10 @@ async function main() {
     'branches.view',
     'warehouses.view',
     'products.view',
+    'customers.manage',
+    'customers.view',
+    'suppliers.manage',
+    'suppliers.view',
     'inventory.manage',
     'inventory.view',
     'sales.create',

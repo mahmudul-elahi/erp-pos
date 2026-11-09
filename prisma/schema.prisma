@@ -99,9 +99,11 @@ model Branch {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  warehouses   Warehouse[]
-  userBranches UserBranch[]
-  auditLogs    AuditLog[]
+  warehouses            Warehouse[]
+  userBranches          UserBranch[]
+  auditLogs             AuditLog[]
+  customerLedgerEntries CustomerLedgerEntry[]
+  supplierLedgerEntries SupplierLedgerEntry[]
 
   @@map("branches")
 }
@@ -402,4 +404,110 @@ model ProductSpecification {
 
   @@index([productId])
   @@map("product_specifications")
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 3: People & Ledgers (Customers & Suppliers)
+// ---------------------------------------------------------------------------
+
+enum LedgerEntryType {
+  OPENING_BALANCE
+  SALE
+  PURCHASE
+  PAYMENT
+  RETURN
+  ADJUSTMENT
+}
+
+model Customer {
+  id          String    @id @default(uuid())
+  name        String
+  phone       String    @unique
+  email       String?
+  address     String?
+  city        String?
+  postalCode  String?   @map("postal_code")
+  notes       String?
+  creditLimit Decimal?  @map("credit_limit") @db.Decimal(18, 2)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  ledgerEntries CustomerLedgerEntry[]
+
+  @@index([phone])
+  @@index([name])
+  @@map("customers")
+}
+
+model CustomerLedgerEntry {
+  id            String          @id @default(uuid())
+  customerId    String          @map("customer_id")
+  branchId      String?         @map("branch_id")
+  type          LedgerEntryType
+  amount        Decimal         @db.Decimal(18, 2)
+  debit         Decimal         @default(0) @db.Decimal(18, 2)
+  credit        Decimal         @default(0) @db.Decimal(18, 2)
+  balanceAfter  Decimal         @map("balance_after") @db.Decimal(18, 2)
+  referenceType String?         @map("reference_type")
+  referenceId   String?         @map("reference_id")
+  description   String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("customer_ledger_entries")
+}
+
+model Supplier {
+  id            String    @id @default(uuid())
+  companyName   String    @map("company_name")
+  contactPerson String?   @map("contact_person")
+  phone         String    @unique
+  email         String?
+  address       String?
+  taxNumber     String?   @map("tax_number")
+  tradeLicense  String?   @map("trade_license")
+  notes         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  ledgerEntries SupplierLedgerEntry[]
+
+  @@index([phone])
+  @@index([companyName])
+  @@map("suppliers")
+}
+
+model SupplierLedgerEntry {
+  id            String          @id @default(uuid())
+  supplierId    String          @map("supplier_id")
+  branchId      String?         @map("branch_id")
+  type          LedgerEntryType
+  amount        Decimal         @db.Decimal(18, 2)
+  debit         Decimal         @default(0) @db.Decimal(18, 2)
+  credit        Decimal         @default(0) @db.Decimal(18, 2)
+  balanceAfter  Decimal         @map("balance_after") @db.Decimal(18, 2)
+  referenceType String?         @map("reference_type")
+  referenceId   String?         @map("reference_id")
+  description   String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([supplierId])
+  @@index([branchId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("supplier_ledger_entries")
 }

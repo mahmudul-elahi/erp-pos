@@ -27,6 +27,8 @@ import { CategoriesModule } from './modules/categories/categories.module.js';
 import { BrandsModule } from './modules/brands/brands.module.js';
 import { AttributesModule } from './modules/attributes/attributes.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
+import { CustomersModule } from './modules/customers/customers.module.js';
+import { SuppliersModule } from './modules/suppliers/suppliers.module.js';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { ProductsModule } from './modules/products/products.module.js';
     BrandsModule,
     AttributesModule,
     ProductsModule,
+    CustomersModule,
+    SuppliersModule,
   ],
   providers: [
     {

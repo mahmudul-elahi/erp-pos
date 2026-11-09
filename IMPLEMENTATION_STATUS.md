@@ -12,7 +12,7 @@ Specification: POS + E-commerce + Light ERP Backend (NestJS 12 + Prisma + Postgr
 | **Phase 0** | Inspection, Architecture & Baseline | Environment, Docker Compose, baseline tests, architecture docs | 🟢 Completed | Docker Compose, baseline test suite, .env verified |
 | **Phase 1** | Foundation & Core Infrastructure | Auth, RBAC, Users, Roles, Permissions, Branches, Warehouses, Audit Logs, MinIO Storage, Swagger | 🟢 Completed | Migration `20261109164704_init_foundation`, seed script, 34 tests passing |
 | **Phase 2** | Product Catalog | Categories, Brands, Products, Variants, Attributes, Barcodes, Specifications | 🟢 Completed | Migration `20261109170543_add_product_catalog`, 53 total tests passing |
-| **Phase 3** | People & Ledgers | Customers, Suppliers, Contact Info, Auditable Opening Balances, Ledgers | ⬜ Pending | |
+| **Phase 3** | People & Ledgers | Customers, Suppliers, Contact Info, Auditable Opening Balances, Ledgers | 🟢 Completed | Migration `20261109171513_add_people_and_ledgers`, 68 total tests passing |
 | **Phase 4** | Inventory Engine | Inventory balances, immutable movements, adjustments, transfers, damage write-offs | ⬜ Pending | Non-negative stock constraints, transaction locking |
 | **Phase 5** | Purchases & Purchase Returns | Supplier purchase orders, stock receiving, purchase returns, supplier refunds/credits | ⬜ Pending | |
 | **Phase 6** | POS Sales & Cash Register | Point of sale checkout, register shifts, cash in/out, sales returns & refunds | ⬜ Pending | Offline vs online, multi-payment support |
@@ -84,5 +84,26 @@ Specification: POS + E-commerce + Light ERP Backend (NestJS 12 + Prisma + Postgr
 - **Test Results**:
   - Unit tests: 33 passing (+11 tests in Phase 2)
   - End-to-End tests: 20 passing (+8 tests in Phase 2)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+
+---
+
+## Phase 3 Execution Summary
+
+- **Database Migration**: `20261109171513_add_people_and_ledgers`
+  - Tables: `customers`, `customer_ledger_entries`, `suppliers`, `supplier_ledger_entries`
+- **Features Implemented**:
+  - Customer profiles with contact details, address, notes, credit limits, and active status.
+  - Supplier profiles with company name, contact person, phone, email, address, TIN/BIN, and trade license.
+  - Strict financial integrity: balances are **never** stored as independently editable numbers. Balances are derived dynamically from transaction debits/credits, with balance snapshots recorded on immutable ledger entries.
+  - Transactional opening balance setup: positive opening balance records customer due (debit) or store payable (credit); negative balance records customer credit or store advance.
+  - Full customer and supplier immutable ledger histories (`GET /customers/:id/ledger`, `GET /suppliers/:id/ledger`).
+  - Auditable manual adjustments (`POST /customers/:id/adjustments`, `POST /suppliers/:id/adjustments`) tracking reasons, actors, and updating running balances.
+  - Role-based permissions: `customers.manage`, `customers.view`, `suppliers.manage`, `suppliers.view`.
+- **Test Results**:
+  - Unit tests: 41 passing (+8 tests in Phase 3)
+  - End-to-End tests: 27 passing (+7 tests in Phase 3)
   - Oxlint: 0 warnings, 0 errors
   - Build: cleanly compiled
