@@ -29,6 +29,11 @@ import { AttributesModule } from './modules/attributes/attributes.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
 import { SuppliersModule } from './modules/suppliers/suppliers.module.js';
+import { InventoryModule } from './modules/inventory/inventory.module.js';
+import { PurchasesModule } from './modules/purchases/purchases.module.js';
+import { SalesModule } from './modules/sales/sales.module.js';
+import { OrdersModule } from './modules/orders/orders.module.js';
+import { CouriersModule } from './modules/couriers/couriers.module.js';
 
 @Module({
   imports: [
@@ -65,6 +70,11 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module.js';
     ProductsModule,
     CustomersModule,
     SuppliersModule,
+    InventoryModule,
+    PurchasesModule,
+    SalesModule,
+    OrdersModule,
+    CouriersModule,
   ],
   providers: [
     {

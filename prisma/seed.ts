@@ -45,9 +45,11 @@ const PERMISSIONS = [
   { name: 'purchases.receive', module: 'purchases', description: 'Receive purchased inventory' },
   { name: 'purchases.view', module: 'purchases', description: 'View purchases and suppliers' },
 
-  // Orders
+  // Orders & Couriers
   { name: 'orders.manage', module: 'orders', description: 'Update order status and workflow' },
   { name: 'orders.view', module: 'orders', description: 'View orders list and history' },
+  { name: 'couriers.manage', module: 'couriers', description: 'Dispatch courier shipments and manage courier settings' },
+  { name: 'couriers.view', module: 'couriers', description: 'View shipments and tracking info' },
 
   // Reports
   { name: 'reports.view', module: 'reports', description: 'View financial and operational reports' },
@@ -135,6 +137,8 @@ async function main() {
     'purchases.view',
     'orders.manage',
     'orders.view',
+    'couriers.manage',
+    'couriers.view',
     'reports.view',
   ];
   for (const perm of allPerms.filter((p) => managerPermNames.includes(p.name))) {
