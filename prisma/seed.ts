@@ -51,8 +51,41 @@ const PERMISSIONS = [
   { name: 'couriers.manage', module: 'couriers', description: 'Dispatch courier shipments and manage courier settings' },
   { name: 'couriers.view', module: 'couriers', description: 'View shipments and tracking info' },
 
-  // Reports
+  // Cash Accounts & Expenses
+  { name: 'cash_accounts.manage', module: 'cash_accounts', description: 'Create and transfer between cash accounts' },
+  { name: 'cash_accounts.view', module: 'cash_accounts', description: 'View cash accounts and transaction ledgers' },
+  { name: 'expenses.manage', module: 'expenses', description: 'Create and manage store expenses' },
+  { name: 'expenses.view', module: 'expenses', description: 'View store expenses and expense categories' },
+
+  // Marketing & Reviews
+  { name: 'marketing.manage', module: 'marketing', description: 'Create coupons, promotions, and storefront banners' },
+  { name: 'marketing.view', module: 'marketing', description: 'View coupons, promotions, and banners' },
+  { name: 'reviews.manage', module: 'marketing', description: 'Moderate and manage customer product reviews' },
+
+  // Gadget-Specific Workflows
+  { name: 'gadgets.buyback_manage', module: 'gadgets', description: 'Inspect, negotiate, and purchase buyback devices' },
+  { name: 'gadgets.buyback_view', module: 'gadgets', description: 'View buyback requests' },
+  { name: 'gadgets.warranty_manage', module: 'gadgets', description: 'Manage and update warranty claims' },
+  { name: 'gadgets.warranty_view', module: 'gadgets', description: 'View warranty claims and verify device IMEI/serial' },
+
+  // Telesales
+  { name: 'telesales.lead_manage', module: 'telesales', description: 'Create, assign, update, and convert telesales leads' },
+  { name: 'telesales.lead_view', module: 'telesales', description: 'View telesales leads and customer interaction logs' },
+  { name: 'telesales.call_log', module: 'telesales', description: 'Log outbound calls and scheduled customer callbacks' },
+
+  // Partners (Dealers, Retailers, B2B, Franchises)
+  { name: 'partners.manage', module: 'partners', description: 'Create, approve, and manage partner accounts and price tiers' },
+  { name: 'partners.view', module: 'partners', description: 'View partner accounts and ledgers' },
+  { name: 'partners.ledger_manage', module: 'partners', description: 'Record partner invoices, payments, and commission credits' },
+
+  // Director Treasury
+  { name: 'directors.manage', module: 'directors', description: 'Create and manage directors and shareholding percentage' },
+  { name: 'directors.view', module: 'directors', description: 'View director profiles and capital/drawing ledgers' },
+  { name: 'directors.transaction', module: 'directors', description: 'Process director capital deposits and drawing withdrawals' },
+
+  // Reports & Dashboard
   { name: 'reports.view', module: 'reports', description: 'View financial and operational reports' },
+  { name: 'dashboard.view', module: 'dashboard', description: 'View executive operational dashboards' },
 ];
 
 async function main() {
@@ -139,7 +172,26 @@ async function main() {
     'orders.view',
     'couriers.manage',
     'couriers.view',
+    'cash_accounts.manage',
+    'cash_accounts.view',
+    'expenses.manage',
+    'expenses.view',
+    'marketing.manage',
+    'marketing.view',
+    'reviews.manage',
+    'gadgets.buyback_manage',
+    'gadgets.buyback_view',
+    'gadgets.warranty_manage',
+    'gadgets.warranty_view',
+    'telesales.lead_manage',
+    'telesales.lead_view',
+    'telesales.call_log',
+    'partners.manage',
+    'partners.view',
+    'partners.ledger_manage',
+    'directors.view',
     'reports.view',
+    'dashboard.view',
   ];
   for (const perm of allPerms.filter((p) => managerPermNames.includes(p.name))) {
     await prisma.rolePermission.upsert({
@@ -264,6 +316,57 @@ async function main() {
   });
 
   console.log(`✓ Seeded Super Admin: ${adminEmail}`);
+
+  // 5. Seed Default Cash Accounts
+  const mainCashAccount = await prisma.cashAccount.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000001' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Main Cash Drawer',
+      type: 'CASH',
+      balance: 0,
+      branchId: mainBranch.id,
+      isDefault: true,
+      isActive: true,
+    },
+  });
+
+  const pettyCashAccount = await prisma.cashAccount.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000002' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000002',
+      name: 'Petty Cash Wallet',
+      type: 'CASH',
+      balance: 0,
+      branchId: mainBranch.id,
+      isDefault: false,
+      isActive: true,
+    },
+  });
+
+  console.log('✓ Seeded default Cash Accounts');
+
+  // 6. Seed Default Expense Categories
+  const defaultCategories = [
+    { name: 'Shop Rent', code: 'RENT', description: 'Showroom and store rent payments' },
+    { name: 'Electricity & Utilities', code: 'UTILITY', description: 'DESCO, water, internet utilities' },
+    { name: 'Staff Entertainment & Snacks', code: 'SNACKS', description: 'Daily tea and snacks for shop staff' },
+    { name: 'Packaging & Supplies', code: 'SUPPLY', description: 'Bubble wraps, shopping bags, tape' },
+    { name: 'Courier Logistics', code: 'COURIER', description: 'Courier shipping and delivery expenses' },
+    { name: 'Marketing & Advertisements', code: 'MKTG', description: 'Facebook and Google ads' },
+  ];
+
+  for (const cat of defaultCategories) {
+    await prisma.expenseCategory.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: cat,
+    });
+  }
+  console.log('✓ Seeded default Expense Categories');
+
   console.log('Seeding completed successfully.');
 }
 

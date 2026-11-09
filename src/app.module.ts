@@ -34,6 +34,15 @@ import { PurchasesModule } from './modules/purchases/purchases.module.js';
 import { SalesModule } from './modules/sales/sales.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { CouriersModule } from './modules/couriers/couriers.module.js';
+import { CashAccountsModule } from './modules/cash-accounts/cash-accounts.module.js';
+import { ExpensesModule } from './modules/expenses/expenses.module.js';
+import { MarketingModule } from './modules/marketing/marketing.module.js';
+import { GadgetsModule } from './modules/gadgets/gadgets.module.js';
+import { TelesalesModule } from './modules/telesales/telesales.module.js';
+import { PartnersModule } from './modules/partners/partners.module.js';
+import { DirectorsModule } from './modules/directors/directors.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
+import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 
 @Module({
   imports: [
@@ -75,6 +84,15 @@ import { CouriersModule } from './modules/couriers/couriers.module.js';
     SalesModule,
     OrdersModule,
     CouriersModule,
+    CashAccountsModule,
+    ExpensesModule,
+    MarketingModule,
+    GadgetsModule,
+    TelesalesModule,
+    PartnersModule,
+    DirectorsModule,
+    ReportsModule,
+    DashboardModule,
   ],
   providers: [
     {

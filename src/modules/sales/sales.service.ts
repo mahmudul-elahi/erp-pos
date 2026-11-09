@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   BadRequestException,
   Injectable,
@@ -65,8 +66,8 @@ export class SalesService {
 
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const shiftNumber = `SHIFT-${dateStr}-${randomSuffix}`;
+    const uid = randomBytes(4).toString('hex').toUpperCase();
+    const shiftNumber = `SHIFT-${dateStr}-${uid}`;
 
     const shift = await this.prisma.cashRegisterShift.create({
       data: {
@@ -502,8 +503,8 @@ export class SalesService {
 
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const invoiceNumber = `INV-${dateStr}-${randomSuffix}`;
+      const uid = randomBytes(4).toString('hex').toUpperCase();
+      const invoiceNumber = `INV-${dateStr}-${uid}`;
 
       // 1. Create Sale
       const sale = await tx.sale.create({
@@ -783,8 +784,8 @@ export class SalesService {
 
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const returnNumber = `SRTN-${dateStr}-${randomSuffix}`;
+      const uid = randomBytes(4).toString('hex').toUpperCase();
+      const returnNumber = `SRTN-${dateStr}-${uid}`;
 
       // Check current open shift of actor
       const openShift = await tx.cashRegisterShift.findFirst({

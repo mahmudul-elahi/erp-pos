@@ -101,6 +101,12 @@ export class CreateStockAdjustmentItemDto {
   @IsString()
   @IsOptional()
   reason?: string;
+
+  @ApiPropertyOptional({ description: 'Serial or IMEI numbers for serialized products', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  serialNumbers?: string[];
 }
 
 export class CreateStockAdjustmentDto {

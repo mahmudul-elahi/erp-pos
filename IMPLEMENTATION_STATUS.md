@@ -18,8 +18,8 @@ Specification: POS + E-commerce + Light ERP Backend (NestJS 12 + Prisma + Postgr
 | **Phase 6** | POS Sales & Cash Register | Point of sale checkout, register shifts, cash in/out, sales returns & refunds | 🟢 Completed | Migration `20261109174722_add_pos_sales_and_shifts`, 119 total tests passing |
 | **Phase 7** | E-commerce Orders & Workflow | Order intake, state machine transitions, snapshot pricing, reservation rules | 🟢 Completed | Migration `20261109175630_add_orders_and_workflow`, 133 total tests passing |
 | **Phase 8** | Courier Integrations | Unified courier adapter, Pathao, Steadfast, REDX, webhooks & tracking | 🟢 Completed | Migration `20261109180247_add_courier_integrations`, 141 total tests passing |
-| **Phase 9** | Payments, Expenses & Cash Accounts | Multi-method payments, expense tracking, MinIO receipts, ledger entries | ⬜ Pending | |
-| **Phase 10** | Marketing & Storefront Admin | Coupons, promotional offers, banners, articles, product reviews, SEO | ⬜ Pending | |
+| **Phase 9** | Payments, Expenses & Cash Accounts | Multi-method payments, expense tracking, MinIO receipts, ledger entries | 🟢 Completed | Migration `20261109181610_add_payments_expenses_cash_accounts`, 159 total tests passing |
+| **Phase 10** | Marketing & Storefront Admin | Coupons, promotional offers, banners, articles, product reviews, SEO | 🟢 Completed | Migration `20261109182430_add_marketing_and_storefront`, 168 total tests passing |
 | **Phase 11** | Gadget-Specific Workflows | Used devices, device buyback requests, warranties, IMEI/serial verification, gifts | ⬜ Pending | |
 | **Phase 12** | Telesales & Confirmation | Agent assignments, call logs, disposition tracking, callback scheduling | ⬜ Pending | Uses same core order workflow |
 | **Phase 13** | Partner Network | Dealers, Retailers, B2B, Franchises, partner tiers & price lists | ⬜ Pending | |
@@ -258,5 +258,201 @@ Specification: POS + E-commerce + Light ERP Backend (NestJS 12 + Prisma + Postgr
 - **Test Results**:
   - Unit tests: 74 passing (+2 tests in Phase 8)
   - End-to-End tests: 67 passing (+6 tests in Phase 8)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+
+---
+
+## Phase 9 Execution Summary
+
+- **Database Migration**: `20261109181610_add_payments_expenses_cash_accounts`
+  - Tables: `cash_accounts`, `cash_account_transactions`, `expense_categories`, `expenses`
+  - Enums: `CashAccountType` (`CASH`, `BANK`, `MFS`), `CashTransactionType` (`OPENING_BALANCE`, `DEPOSIT`, `WITHDRAWAL`, `TRANSFER_IN`, `TRANSFER_OUT`, `EXPENSE`, `SALE_PAYMENT`, `PURCHASE_PAYMENT`, `DIRECTOR_DEPOSIT`, `DIRECTOR_WITHDRAWAL`, `ADJUSTMENT`)
+- **Features Implemented**:
+  - **Cash & Bank Accounts Treasury Engine**:
+    - Multi-account management (`CASH` counters/drawers, `BANK` current/savings accounts, `MFS` merchant wallets like bKash/Nagad).
+    - Initial opening balance setup with automated ledger tracking.
+    - Manual deposits and withdrawals with balance checks and immutable ledger logs (`CashAccountTransaction`).
+    - Atomic inter-account fund transfers (`TRANSFER_OUT` from source, `TRANSFER_IN` to destination) with non-negative balance enforcement.
+    - Full transaction ledger query endpoint with pagination and search.
+  - **Expense Categories & Store Expenses**:
+    - Pre-seeded default categories: Rent, Utilities, Entertainment, Packaging, Logistics, Marketing.
+    - Expense creation deducting balance from paying cash/bank account in real-time.
+    - Strict validation against insufficient cash account balances.
+    - Integration with MinIO file storage (`receiptFileId`) for digital voucher receipts.
+    - Filterable expense queries by category, account, branch, and date range.
+  - **Role-Based Permissions**:
+    - `cash_accounts.manage`, `cash_accounts.view`, `expenses.manage`, `expenses.view`.
+- **Test Results**:
+  - Unit tests: 81 passing (+7 tests in Phase 9)
+  - End-to-End tests: 78 passing (+11 tests in Phase 9)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+
+---
+
+## Phase 10 Execution Summary
+
+- **Database Migration**: `20261109182430_add_marketing_and_storefront`
+  - Tables: `coupons`, `coupon_usages`, `promotion_offers`, `storefront_banners`, `product_reviews`
+  - Enums: `CouponDiscountType` (`PERCENTAGE`, `FIXED_AMOUNT`), `BannerPosition` (`HERO`, `SIDEBAR`, `PROMO_STRIP`, `POPUP`)
+- **Features Implemented**:
+  - **Coupons & Discount Engine**:
+    - Percentage or fixed amount coupons with start/end validity dates.
+    - Configurable minimum order spending thresholds (`minOrderAmount`) and percentage discount caps (`maxDiscountAmount`).
+    - Global and per-customer usage limits with atomic redemption counters.
+    - Real-time coupon validation endpoint (`POST /api/v1/marketing/coupons/validate`) calculating exact discounts for cart subtotal.
+  - **Promotional Offers & Flash Sales**:
+    - Campaigns with slugs, promotional banners, flat discount percentages, and associated product arrays.
+    - Public promotional endpoints for storefront exploration.
+  - **Storefront Banners**:
+    - Manageable hero, sidebar, popup, and promo strip banners with click-through links and MinIO image attachments.
+  - **Product Reviews & Moderation**:
+    - Public review submissions (1 to 5 stars, title, comment).
+    - Reviews start unapproved; admin moderation workflow (`PATCH /api/v1/marketing/reviews/:id/moderate`).
+    - Public product reviews endpoint filters to approved reviews only.
+  - **Role-Based Permissions**:
+    - `marketing.manage`, `marketing.view`, `reviews.manage`.
+- **Test Results**:
+  - Unit tests: 85 passing (+4 tests in Phase 10)
+  - End-to-End tests: 83 passing (+5 tests in Phase 10)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+---
+
+## Phase 11 Execution Summary
+
+- **Database Migration**: `20261109183122_add_gadget_workflows`
+  - Tables: `device_buyback_requests`, `warranty_claims`, `gift_bundles`, `gift_bundle_items`
+  - Enums: `BuybackStatus` (`PENDING`, `INSPECTED`, `OFFERED`, `ACCEPTED`, `REJECTED`, `PURCHASED`), `DeviceCondition` (`BRAND_NEW`, `LIKE_NEW`, `EXCELLENT`, `GOOD`, `FAIR`, `FAULTY`), `WarrantyClaimStatus` (`PENDING`, `IN_INSPECTION`, `APPROVED`, `SENT_TO_SERVICE_CENTER`, `REPAIRED`, `REPLACED`, `REJECTED`, `DELIVERED_TO_CUSTOMER`)
+- **Features Implemented**:
+  - **Device Buybacks & Trade-in Intake**:
+    - Public submission endpoint for customer used phones/gadgets (`POST /api/v1/gadgets/buybacks`).
+    - Tracks IMEI, device condition, battery health %, inclusion of accessories (box, charger), and expected customer price.
+    - Admin inspection workflow (`PATCH /api/v1/gadgets/buybacks/:id/status`) with offered store purchase price and status transitions.
+  - **Device Verification & Authenticity Check**:
+    - Public / customer IMEI or serial lookup endpoint (`GET /api/v1/gadgets/verify/:identifier`).
+    - Verifies genuine device origin, original purchase invoice, sale date, customer information, and real-time warranty coverage status.
+  - **Warranty Claims Lifecycle**:
+    - Serialized gadget warranty intake (`POST /api/v1/gadgets/warranties/claims`).
+    - Automatic validation of invoice authenticity, remaining warranty duration, and customer matching.
+    - Full service lifecycle management (`PATCH /api/v1/gadgets/warranties/claims/:id/status`), tracking technician notes, service costs, and resolution (`REPAIRED`, `REPLACED`, `REJECTED`).
+  - **Promotional Gift Bundling**:
+    - Bundle management (`POST /api/v1/gadgets/bundles`) allowing flagship products to be paired with free promotional accessories (chargers, cases, earphones).
+  - **Role-Based Permissions**:
+    - `gadgets.buyback_view`, `gadgets.buyback_manage`, `gadgets.warranty_view`, `gadgets.warranty_manage`, `gadgets.bundle_manage`.
+- **Test Results**:
+  - Unit tests: 90 passing (+5 tests in Phase 11)
+  - End-to-End tests: 93 passing (+10 tests in Phase 11)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+---
+
+## Phase 12 Execution Summary
+
+- **Database Migration**: `20261109184651_add_telesales_partners_directors`
+  - Tables: `telesales_leads`, `telesales_call_logs`
+  - Enums: `LeadSource` (`FACEBOOK`, `WEBSITE`, `WHATSAPP`, `PHONE_CALL`, `WALK_IN`, `OTHER`), `LeadDisposition` (`NEW`, `INTERESTED`, `CONFIRMED`, `CALLBACK_REQUESTED`, `UNREACHABLE`, `CANCELLED`, `WRONG_NUMBER`)
+- **Features Implemented**:
+  - **Telesales Lead Acquisition & Pipeline**:
+    - Endpoints for inbound and multi-channel lead ingestion (`POST /api/v1/telesales/leads`).
+    - Tracks full customer contact details, acquisition channel, street delivery address, notes, and agent assignment.
+    - Filterable and searchable leads list (`GET /api/v1/telesales/leads`) by disposition, acquisition source, assigned agent, phone, or name.
+  - **Outbound Call Logging & Callback Scheduling**:
+    - Telesales call outcome recording (`POST /api/v1/telesales/leads/:id/calls`).
+    - Captures call duration, agent notes, call disposition, and scheduled follow-up timestamps (`callbackAt`).
+    - Automatically updates the parent lead's disposition and callback queue in a single transaction.
+  - **Direct Lead-to-Order Conversion**:
+    - One-click checkout conversion (`POST /api/v1/telesales/leads/:id/convert-to-order`).
+    - Converts lead data directly into a fulfillment order in `OrdersService` tagged with `source: TELESALES`.
+    - Automatically transitions lead disposition to `CONFIRMED`, stores `convertedOrderId`, and prevents duplicate conversions.
+  - **Role-Based Permissions**:
+    - `telesales.lead_manage`, `telesales.lead_view`, `telesales.call_log`.
+- **Test Results**:
+  - Unit tests: 95 passing (+5 tests in Phase 12)
+  - End-to-End tests: 102 passing (+9 tests in Phase 12)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+---
+
+## Phase 13 Execution Summary
+
+- **Database Migration**: `20261109184651_add_telesales_partners_directors`
+  - Tables: `partner_price_tiers`, `partners`, `partner_ledger_entries`
+  - Enums: `PartnerType` (`DEALER`, `RETAILER`, `B2B`, `FRANCHISE`), `PartnerStatus` (`PENDING`, `APPROVED`, `SUSPENDED`, `REJECTED`), `PartnerLedgerType` (`INVOICE`, `PAYMENT`, `COMMISSION`, `ADJUSTMENT`)
+- **Features Implemented**:
+  - **Tiered Wholesale Pricing Structure**:
+    - Manageable wholesale discount tiers (`POST /api/v1/partners/price-tiers`).
+    - Dynamic wholesale price calculation endpoint (`GET /api/v1/partners/:id/wholesale-price?basePrice=...`) applying discount percentages to base retail prices.
+  - **Partner Onboarding & Account Management**:
+    - Onboarding of B2B partners, authorized tech dealers, retailers, and franchises (`POST /api/v1/partners`).
+    - Automatic generation of formatted partner numbers (`PTR-YYYYMMDD-XXXX`).
+    - Full tracking of trade licenses, BIN, NID, assigned price tier, and credit limits.
+  - **Credit Limit & Double-Entry Partner Ledger**:
+    - Audit-logged transactions for wholesale credit invoices, bank/cash payments, and franchise commissions (`POST /api/v1/partners/:id/ledger`).
+    - Enforces hard credit limits (`creditLimit`), strictly prohibiting new credit invoices if the limit is exceeded.
+    - Immutable `PartnerLedgerEntry` recording `balanceBefore` and `balanceAfter`.
+  - **Role-Based Permissions**:
+    - `partners.manage`, `partners.view`, `partners.ledger_manage`.
+- **Test Results**:
+  - Unit tests: 101 passing (+6 tests in Phase 13)
+  - End-to-End tests: 112 passing (+10 tests in Phase 13)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+---
+
+## Phase 14 Execution Summary
+
+- **Database Migration**: `20261109184651_add_telesales_partners_directors`
+  - Tables: `directors`, `director_transactions`
+  - Enums: `DirectorTxType` (`CAPITAL_DEPOSIT`, `DRAWING_WITHDRAWAL`, `PROFIT_SHARE`)
+- **Features Implemented**:
+  - **Director & Shareholding Equity Registry**:
+    - Director registration and equity share percentage allocation (`POST /api/v1/directors`).
+    - Cumulative shareholding guard strictly prohibiting total equity share allocation from exceeding 100%.
+  - **Double-Entry Capital Injection & Owner Drawing Treasury**:
+    - Capital deposit endpoint (`POST /api/v1/directors/:id/transactions` with `CAPITAL_DEPOSIT`) incrementing director's `totalDeposited`, crediting target `CashAccount` balance, and writing immutable `DIRECTOR_DEPOSIT` cash transaction ledger entry.
+    - Owner drawing withdrawal endpoint (`POST /api/v1/directors/:id/transactions` with `DRAWING_WITHDRAWAL`) incrementing director's `totalWithdrawn`, debiting target `CashAccount` balance, enforcing sufficient fund validation, and writing immutable `DIRECTOR_WITHDRAWAL` cash transaction ledger entry.
+  - **Audit Ledgers & Transaction History**:
+    - Paginated and filterable transaction ledgers (`GET /api/v1/directors/:id/transactions`).
+  - **Role-Based Permissions**:
+    - `directors.manage`, `directors.view`, `directors.transaction`.
+- **Test Results**:
+  - Unit tests: 106 passing (+5 tests in Phase 14)
+  - End-to-End tests: 120 passing (+8 tests in Phase 14)
+  - Oxlint: 0 warnings, 0 errors
+  - Build: cleanly compiled
+
+---
+
+## Phase 15 Execution Summary
+
+- **Features Implemented**:
+  - **Financial Profit & Loss (P&L) Statement**:
+    - Period-filtered financial report (`GET /api/v1/reports/profit-and-loss`).
+    - Aggregates Gross Sales Revenue across POS and non-cancelled Orders.
+    - Factors in Sales Returns and customer refunds to produce Net Sales Revenue.
+    - Dynamically computes accurate Cost of Goods Sold (COGS) based on sold inventory unit cost prices.
+    - Deducts Operating Expenses from store expense vouchers to produce exact Net Profit and net profit margin percentages.
+  - **Inventory Stock Valuation (Cost vs Retail)**:
+    - Real-time stock valuation report (`GET /api/v1/reports/inventory-valuation`).
+    - Calculates total SKUs, physical on-hand units, total cost valuation, total retail selling valuation, and potential gross profit margin across warehouses.
+  - **Multi-Channel Sales Performance**:
+    - Sales summary breakdown (`GET /api/v1/reports/sales-summary`) segmenting transactions and revenue by sales channel: POS Counter, E-Commerce Storefront, and Telesales CRM.
+  - **Cash Register Shift Discrepancy Auditing**:
+    - Shift cash audit report (`GET /api/v1/reports/register-discrepancies`) comparing cashier closing cash counted against expected register cash to surface cash drawer overages and shortages.
+  - **Executive Operational Dashboard**:
+    - High-level KPI summary (`GET /api/v1/dashboard/metrics`) reporting today's revenue, order velocity, pending orders to dispatch, low stock alerts count, active warranty claim count, and multi-channel treasury liquidity (Cash on Hand, Bank Accounts, Mobile Financial Services).
+  - **Role-Based Permissions**:
+    - `reports.view`, `dashboard.view`.
+- **Test Results**:
+  - Unit tests: 111 passing (+5 tests in Phase 15)
+  - End-to-End tests: 127 passing (+7 tests in Phase 15)
   - Oxlint: 0 warnings, 0 errors
   - Build: cleanly compiled

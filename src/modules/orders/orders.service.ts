@@ -590,4 +590,8 @@ export class OrdersService {
 
     return order;
   }
+
+  createOrder(dto: CreateOrderDto, actorId?: string) {
+    return this.create(dto, actorId);
+  }
 }

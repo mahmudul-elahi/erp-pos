@@ -50,6 +50,17 @@ model User {
   ordersCreated             Order[]             @relation("OrdersCreated")
   orderStatusChanges        OrderStatusHistory[]
   shipmentsCreated          CourierShipment[]   @relation("ShipmentsCreated")
+  cashTransactionsCreated   CashAccountTransaction[] @relation("CashTransactionsCreated")
+  expensesCreated           Expense[]           @relation("ExpensesCreated")
+  buybacksInspected         DeviceBuybackRequest[] @relation("BuybacksInspected")
+  buybacksCreated           DeviceBuybackRequest[] @relation("BuybacksCreated")
+  warrantyClaimsCreated     WarrantyClaim[]     @relation("WarrantyClaimsCreated")
+  assignedTelesalesLeads    TelesalesLead[]       @relation("AssignedTelesalesLeads")
+  createdTelesalesLeads     TelesalesLead[]       @relation("CreatedTelesalesLeads")
+  telesalesCallLogs         TelesalesCallLog[]    @relation("TelesalesAgentLogs")
+  partnersCreated           Partner[]             @relation("PartnersCreated")
+  partnerLedgerCreated      PartnerLedgerEntry[]  @relation("PartnerLedgerCreated")
+  directorTxCreated         DirectorTransaction[] @relation("DirectorTxCreated")
 
   @@map("users")
 }
@@ -128,6 +139,9 @@ model Branch {
   sales                 Sale[]
   saleReturns           SaleReturn[]
   orders                Order[]
+  cashAccounts          CashAccount[]
+  expenses              Expense[]
+  partners              Partner[]
 
   @@map("branches")
 }
@@ -214,8 +228,11 @@ model FileRecord {
   createdAt    DateTime  @default(now()) @map("created_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  uploadedBy    User?          @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  productImages ProductImage[]
+  uploadedBy      User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  productImages   ProductImage[]
+  expenses        Expense[]
+  banners         StorefrontBanner[]
+  promotionOffers PromotionOffer[]
 
   @@index([module, entityType, entityId])
   @@index([uploadedById])
@@ -347,6 +364,10 @@ model Product {
   saleItems           SaleItem[]
   saleReturnItems     SaleReturnItem[]
   orderItems          OrderItem[]
+  reviews             ProductReview[]
+  warrantyClaims      WarrantyClaim[]
+  bundlePrimaryProducts GiftBundleItem[] @relation("BundlePrimaryProducts")
+  bundleGiftProducts  GiftBundleItem[]   @relation("BundleGiftProducts")
 
   @@index([categoryId])
   @@index([brandId])
@@ -494,6 +515,8 @@ model Customer {
   sales         Sale[]
   saleReturns   SaleReturn[]
   orders        Order[]
+  couponUsages  CouponUsage[]
+  reviews       ProductReview[]
 
   @@index([phone])
   @@index([name])
@@ -1043,6 +1066,7 @@ model Sale {
   items     SaleItem[]
   payments  SalePayment[]
   returns   SaleReturn[]
+  warrantyClaims WarrantyClaim[]
 
   @@index([branchId])
   @@index([warehouseId])
@@ -1195,6 +1219,7 @@ model Order {
   customerId          String?            @map("customer_id")
   warehouseId         String             @map("warehouse_id")
   branchId            String?            @map("branch_id")
+  partnerId           String?            @map("partner_id")
   status              OrderStatus        @default(PENDING)
   paymentStatus       OrderPaymentStatus @default(UNPAID) @map("payment_status")
   paymentMethod       OrderPaymentMethod @default(COD) @map("payment_method")
@@ -1224,15 +1249,19 @@ model Order {
   customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   warehouse     Warehouse            @relation(fields: [warehouseId], references: [id])
   branch        Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  partner       Partner?             @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   createdBy     User?                @relation("OrdersCreated", fields: [createdById], references: [id], onDelete: SetNull)
   items         OrderItem[]
   statusHistory OrderStatusHistory[]
   payments      OrderPayment[]
   shipments     CourierShipment[]
+  couponUsages  CouponUsage[]
+  telesalesLeads TelesalesLead[]     @relation("TelesalesOrder")
 
   @@index([customerId])
   @@index([warehouseId])
   @@index([branchId])
+  @@index([partnerId])
   @@index([status])
   @@index([paymentStatus])
   @@index([customerPhone])
@@ -1345,4 +1374,582 @@ model CourierShipment {
   @@index([status])
   @@index([createdAt])
   @@map("courier_shipments")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9: Payments, Expenses & Cash Accounts
+// ---------------------------------------------------------------------------
+
+enum CashAccountType {
+  CASH
+  BANK
+  MFS
+}
+
+enum CashTransactionType {
+  OPENING_BALANCE
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  EXPENSE
+  SALE_PAYMENT
+  PURCHASE_PAYMENT
+  DIRECTOR_DEPOSIT
+  DIRECTOR_WITHDRAWAL
+  ADJUSTMENT
+}
+
+model CashAccount {
+  id            String          @id @default(uuid())
+  name          String
+  type          CashAccountType @default(CASH)
+  accountNumber String?         @map("account_number")
+  bankName      String?         @map("bank_name")
+  branchName    String?         @map("branch_name")
+  balance       Decimal         @default(0) @db.Decimal(18, 2)
+  branchId      String?         @map("branch_id")
+  isActive      Boolean         @default(true) @map("is_active")
+  isDefault     Boolean         @default(false) @map("is_default")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  branch            Branch?                  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  transactions      CashAccountTransaction[]
+  expenses          Expense[]
+  transfersReceived CashAccountTransaction[] @relation("TransferredAccounts")
+  directorTransactions DirectorTransaction[]
+
+  @@index([type])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("cash_accounts")
+}
+
+model CashAccountTransaction {
+  id                String              @id @default(uuid())
+  transactionNumber String              @unique @map("transaction_number")
+  accountId         String              @map("account_id")
+  type              CashTransactionType
+  amount            Decimal             @db.Decimal(18, 2)
+  balanceBefore     Decimal             @db.Decimal(18, 2) @map("balance_before")
+  balanceAfter      Decimal             @db.Decimal(18, 2) @map("balance_after")
+  referenceType     String?             @map("reference_type")
+  referenceId       String?             @map("reference_id")
+  transferAccountId String?             @map("transfer_account_id")
+  description       String?
+  createdById       String?             @map("created_by_id")
+  createdAt         DateTime            @default(now()) @map("created_at")
+
+  account         CashAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transferAccount CashAccount? @relation("TransferredAccounts", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  createdBy       User?        @relation("CashTransactionsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("cash_account_transactions")
+}
+
+model ExpenseCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String?  @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  expenses Expense[]
+
+  @@index([isActive])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  expenseNumber String   @unique @map("expense_number")
+  categoryId    String   @map("category_id")
+  accountId     String   @map("account_id")
+  branchId      String?  @map("branch_id")
+  amount        Decimal  @db.Decimal(18, 2)
+  expenseDate   DateTime @default(now()) @map("expense_date")
+  payee         String?
+  receiptFileId String?  @map("receipt_file_id")
+  notes         String?
+  createdById   String?  @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  account     CashAccount     @relation(fields: [accountId], references: [id])
+  branch      Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  receiptFile FileRecord?     @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+  createdBy   User?           @relation("ExpensesCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([branchId])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 10: Marketing & Storefront Admin Models
+// ---------------------------------------------------------------------------
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum BannerPosition {
+  HERO
+  SIDEBAR
+  PROMO_STRIP
+  POPUP
+}
+
+model Coupon {
+  id                String             @id @default(uuid())
+  code              String             @unique
+  type              CouponDiscountType @default(PERCENTAGE)
+  value             Decimal            @db.Decimal(18, 2)
+  minOrderAmount    Decimal            @default(0) @db.Decimal(18, 2) @map("min_order_amount")
+  maxDiscountAmount Decimal?           @map("max_discount_amount") @db.Decimal(18, 2)
+  usageLimit        Int?               @map("usage_limit")
+  usedCount         Int                @default(0) @map("used_count")
+  perCustomerLimit  Int?               @default(1) @map("per_customer_limit")
+  startDate         DateTime           @map("start_date")
+  endDate           DateTime           @map("end_date")
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  usages CouponUsage[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([startDate, endDate])
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id             String   @id @default(uuid())
+  couponId       String   @map("coupon_id")
+  orderId        String?  @map("order_id")
+  customerId     String?  @map("customer_id")
+  discountAmount Decimal  @db.Decimal(18, 2) @map("discount_amount")
+  usedAt         DateTime @default(now()) @map("used_at")
+
+  coupon   Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([couponId])
+  @@index([orderId])
+  @@index([customerId])
+  @@map("coupon_usages")
+}
+
+model PromotionOffer {
+  id                 String    @id @default(uuid())
+  title              String
+  slug               String    @unique
+  description        String?
+  bannerFileId       String?   @map("banner_file_id")
+  discountPercentage Decimal?  @map("discount_percentage") @db.Decimal(5, 2)
+  startDate          DateTime  @map("start_date")
+  endDate            DateTime  @map("end_date")
+  isActive           Boolean   @default(true) @map("is_active")
+  productIds         String[]  @default([]) @map("product_ids")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  bannerFile FileRecord? @relation(fields: [bannerFileId], references: [id], onDelete: SetNull)
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([startDate, endDate])
+  @@map("promotion_offers")
+}
+
+model StorefrontBanner {
+  id          String         @id @default(uuid())
+  title       String
+  subtitle    String?
+  linkUrl     String?        @map("link_url")
+  imageFileId String         @map("image_file_id")
+  position    BannerPosition @default(HERO)
+  sortOrder   Int            @default(0) @map("sort_order")
+  isActive    Boolean        @default(true) @map("is_active")
+  startDate   DateTime?      @map("start_date")
+  endDate     DateTime?      @map("end_date")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  imageFile FileRecord @relation(fields: [imageFileId], references: [id], onDelete: Cascade)
+
+  @@index([position])
+  @@index([isActive])
+  @@map("storefront_banners")
+}
+
+model ProductReview {
+  id           String   @id @default(uuid())
+  productId    String   @map("product_id")
+  customerId   String?  @map("customer_id")
+  reviewerName String   @map("reviewer_name")
+  rating       Int      @default(5)
+  title        String?
+  comment      String
+  isApproved   Boolean  @default(false) @map("is_approved")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([customerId])
+  @@index([isApproved])
+  @@map("product_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: Gadget-Specific Workflows Models
+// ---------------------------------------------------------------------------
+
+enum DeviceCondition {
+  MINT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum BuybackStatus {
+  PENDING
+  INSPECTED
+  ACCEPTED
+  REJECTED
+  PURCHASED
+}
+
+enum WarrantyClaimStatus {
+  RECEIVED
+  DIAGNOSING
+  SENT_TO_SERVICE_CENTER
+  REPAIRED
+  REPLACED
+  REJECTED
+  DELIVERED_TO_CUSTOMER
+}
+
+model DeviceBuybackRequest {
+  id              String          @id @default(uuid())
+  requestNumber   String          @unique @map("request_number")
+  customerName    String          @map("customer_name")
+  customerPhone   String          @map("customer_phone")
+  deviceBrand     String          @map("device_brand")
+  deviceModel     String          @map("device_model")
+  imei            String?
+  serialNumber    String?         @map("serial_number")
+  condition       DeviceCondition @default(GOOD)
+  batteryHealth   Int?            @map("battery_health")
+  hasBox          Boolean         @default(false) @map("has_box")
+  hasCharger      Boolean         @default(false) @map("has_charger")
+  hasOriginalBill Boolean         @default(false) @map("has_original_bill")
+  expectedPrice   Decimal?        @map("expected_price") @db.Decimal(18, 2)
+  offeredPrice    Decimal?        @map("offered_price") @db.Decimal(18, 2)
+  status          BuybackStatus   @default(PENDING)
+  notes           String?
+  inspectedById   String?         @map("inspected_by_id")
+  createdById     String?         @map("created_by_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  inspectedBy User? @relation("BuybacksInspected", fields: [inspectedById], references: [id], onDelete: SetNull)
+  createdBy   User? @relation("BuybacksCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([customerPhone])
+  @@index([imei])
+  @@index([serialNumber])
+  @@index([status])
+  @@map("device_buyback_requests")
+}
+
+model WarrantyClaim {
+  id              String              @id @default(uuid())
+  claimNumber     String              @unique @map("claim_number")
+  customerName    String              @map("customer_name")
+  customerPhone   String              @map("customer_phone")
+  serialNumber    String              @map("serial_number")
+  productId       String?             @map("product_id")
+  saleId          String?             @map("sale_id")
+  problemSummary  String              @map("problem_summary")
+  status          WarrantyClaimStatus @default(RECEIVED)
+  repairCost      Decimal             @default(0) @db.Decimal(18, 2) @map("repair_cost")
+  receivedDate    DateTime            @default(now()) @map("received_date")
+  estimatedDate   DateTime?           @map("estimated_date")
+  completedDate   DateTime?           @map("completed_date")
+  technicianNotes String?             @map("technician_notes")
+  createdById     String?             @map("created_by_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sale      Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdBy User?    @relation("WarrantyClaimsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([customerPhone])
+  @@index([serialNumber])
+  @@index([status])
+  @@map("warranty_claims")
+}
+
+model GiftBundle {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items GiftBundleItem[]
+
+  @@map("gift_bundles")
+}
+
+model GiftBundleItem {
+  id               String  @id @default(uuid())
+  bundleId         String  @map("bundle_id")
+  primaryProductId String  @map("primary_product_id")
+  giftProductId    String  @map("gift_product_id")
+  giftQuantity     Int     @default(1) @map("gift_quantity")
+
+  bundle         GiftBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  primaryProduct Product    @relation("BundlePrimaryProducts", fields: [primaryProductId], references: [id], onDelete: Cascade)
+  giftProduct    Product    @relation("BundleGiftProducts", fields: [giftProductId], references: [id], onDelete: Cascade)
+
+  @@unique([bundleId, primaryProductId, giftProductId])
+  @@map("gift_bundle_items")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 12: Telesales & Confirmation Models
+// ---------------------------------------------------------------------------
+
+enum LeadSource {
+  FACEBOOK
+  WEBSITE
+  WHATSAPP
+  PHONE_CALL
+  WALK_IN
+  OTHER
+}
+
+enum LeadDisposition {
+  NEW
+  INTERESTED
+  CONFIRMED
+  CALLBACK_REQUESTED
+  UNREACHABLE
+  CANCELLED
+  WRONG_NUMBER
+}
+
+model TelesalesLead {
+  id               String          @id @default(uuid())
+  leadNumber       String          @unique @map("lead_number")
+  customerName     String          @map("customer_name")
+  phone            String
+  alternatePhone   String?         @map("alternate_phone")
+  email            String?
+  source           LeadSource      @default(WEBSITE)
+  disposition      LeadDisposition @default(NEW)
+  address          String?
+  city             String?
+  notes            String?
+  callbackAt       DateTime?       @map("callback_at")
+  assignedAgentId  String?         @map("assigned_agent_id")
+  convertedOrderId String?         @map("converted_order_id")
+  createdById      String?         @map("created_by_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  assignedAgent    User?               @relation("AssignedTelesalesLeads", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  createdBy        User?               @relation("CreatedTelesalesLeads", fields: [createdById], references: [id], onDelete: SetNull)
+  convertedOrder   Order?              @relation("TelesalesOrder", fields: [convertedOrderId], references: [id], onDelete: SetNull)
+  callLogs         TelesalesCallLog[]
+
+  @@index([phone])
+  @@index([disposition])
+  @@index([assignedAgentId])
+  @@index([createdAt])
+  @@map("telesales_leads")
+}
+
+model TelesalesCallLog {
+  id                  String          @id @default(uuid())
+  leadId              String          @map("lead_id")
+  agentId             String          @map("agent_id")
+  disposition         LeadDisposition
+  callDurationSeconds Int             @default(0) @map("call_duration_seconds")
+  notes               String?
+  callbackAt          DateTime?       @map("callback_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+
+  lead                TelesalesLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent               User            @relation("TelesalesAgentLogs", fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("telesales_call_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 13: Partner Network (Dealers, Retailers, B2B, Franchises) Models
+// ---------------------------------------------------------------------------
+
+enum PartnerType {
+  DEALER
+  RETAILER
+  B2B
+  FRANCHISE
+}
+
+enum PartnerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum PartnerLedgerType {
+  INVOICE
+  PAYMENT
+  COMMISSION
+  ADJUSTMENT
+}
+
+model PartnerPriceTier {
+  id                 String    @id @default(uuid())
+  name               String    @unique
+  discountPercentage Decimal   @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  partners           Partner[]
+
+  @@map("partner_price_tiers")
+}
+
+model Partner {
+  id                 String             @id @default(uuid())
+  partnerNumber      String             @unique @map("partner_number")
+  companyName        String             @map("company_name")
+  contactPerson      String             @map("contact_person")
+  phone              String             @unique
+  email              String?            @unique
+  address            String
+  city               String?
+  type               PartnerType        @default(RETAILER)
+  status             PartnerStatus      @default(PENDING)
+  priceTierId        String?            @map("price_tier_id")
+  creditLimit        Decimal            @default(0) @map("credit_limit") @db.Decimal(18, 2)
+  outstandingBalance Decimal            @default(0) @map("outstanding_balance") @db.Decimal(18, 2)
+  commissionRate     Decimal            @default(0) @map("commission_rate") @db.Decimal(5, 2)
+  tradeLicense       String?            @map("trade_license")
+  binNumber          String?            @map("bin_number")
+  nidNumber          String?            @map("nid_number")
+  branchId           String?            @map("branch_id")
+  createdById        String?            @map("created_by_id")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  priceTier          PartnerPriceTier?  @relation(fields: [priceTierId], references: [id], onDelete: SetNull)
+  branch             Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdBy          User?              @relation("PartnersCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  ledgerEntries      PartnerLedgerEntry[]
+  orders             Order[]
+
+  @@index([phone])
+  @@index([type])
+  @@index([status])
+  @@map("partners")
+}
+
+model PartnerLedgerEntry {
+  id            String            @id @default(uuid())
+  partnerId     String            @map("partner_id")
+  type          PartnerLedgerType
+  amount        Decimal           @db.Decimal(18, 2)
+  balanceBefore Decimal           @db.Decimal(18, 2) @map("balance_before")
+  balanceAfter  Decimal           @db.Decimal(18, 2) @map("balance_after")
+  referenceType String?           @map("reference_type")
+  referenceId   String?           @map("reference_id")
+  notes         String?
+  createdById   String?           @map("created_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  partner       Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy     User?             @relation("PartnerLedgerCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("partner_ledger_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 14: Director / Owner Treasury Models
+// ---------------------------------------------------------------------------
+
+enum DirectorTxType {
+  CAPITAL_DEPOSIT
+  DRAWING_WITHDRAWAL
+  PROFIT_SHARE
+}
+
+model Director {
+  id               String                @id @default(uuid())
+  name             String
+  phone            String                @unique
+  nid              String?               @unique
+  email            String?
+  sharePercentage  Decimal               @default(0) @map("share_percentage") @db.Decimal(5, 2)
+  totalDeposited   Decimal               @default(0) @map("total_deposited") @db.Decimal(18, 2)
+  totalWithdrawn   Decimal               @default(0) @map("total_withdrawn") @db.Decimal(18, 2)
+  isActive         Boolean               @default(true) @map("is_active")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  transactions     DirectorTransaction[]
+
+  @@map("directors")
+}
+
+model DirectorTransaction {
+  id                String          @id @default(uuid())
+  transactionNumber String          @unique @map("transaction_number")
+  directorId        String          @map("director_id")
+  accountId         String          @map("account_id")
+  type              DirectorTxType
+  amount            Decimal         @db.Decimal(18, 2)
+  notes             String?
+  createdById       String?         @map("created_by_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  director          Director        @relation(fields: [directorId], references: [id], onDelete: Cascade)
+  account           CashAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdBy         User?           @relation("DirectorTxCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([directorId])
+  @@index([accountId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("director_transactions")
 }

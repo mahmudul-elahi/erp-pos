@@ -502,6 +502,7 @@ export class InventoryService {
             referenceType: 'STOCK_ADJUSTMENT',
             referenceId: adjustment.id,
             reason: item.reason || dto.reason,
+            serialNumbers: item.serialNumbers,
             actorId,
           });
         }
